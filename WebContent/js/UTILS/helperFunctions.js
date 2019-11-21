@@ -101,22 +101,85 @@ function populateExamples(urlAddrObject){
 //////////////////////////////////////////////////////////////////////
 function performAssertionTest(e){
     e.preventDefault()
-    rows=assertionTester(window.editor.getValue());
+    var assertionSchemas=[]
+    var manualAssertionsJSON=[]
+    var tdToValidate=window.editor.getValue()
 
-    let csvContent = "data:text/csv;charset=utf-8,";
-
-    rows.forEach(function(rowArray) {
-        let row = rowArray.join(",");
-        csvContent += row + "\r\n";
-    });
+    var tdSchema=[];
+    var draft=[];
     
-    var encodedUri = encodeURI(csvContent);
-    var link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    link.setAttribute("download", "assertionResult.csv");
-    document.body.appendChild(link);
 
-    link.click();
+
+    $.getJSON('../AssertionTester/Assertions/list.json', function (assertionList) {
+        
+        
+        
+        for (var i = 0; i < assertionList.length; i++) {
+            // send an AJAX request to each individual JSON file
+            // available on the server as returned by the discover endpoint
+            $.getJSON('../AssertionTester/Assertions/'+assertionList[i], function (assertion) {
+                
+                assertionSchemas.push(assertion);
+                
+            });
+        }
+        console.log(assertionSchemas)
+    
+    });
+
+    //get schema draft
+    var xyz;
+    var test=0;
+    $.getJSON('json-schema-draft-06.json', function (json) {
+                
+        draft=json;
+        $.getJSON('td-schema.json', function (schemajson) {
+                
+            tdSchema=schemajson;
+            var curCsvResults = []
+            try {
+                curCsvResults = assertionValidate(tdToValidate, assertionSchemas, manualAssertionsJSON, tdSchema, draft);
+                
+                //toOutput(JSON.parse(tdToValidate).id, outputLocation, curCsvResults)
+                console.log(curCsvResults);
+            } catch (error) {
+                //this needs to go to output
+                console.log({
+                    "ID": error,
+                    "Status": "fail",
+                    "Comment":"Invalid TD"
+                });
+            }
+            //console.log(schemajson)
+            rows=assertionTester(window.editor.getValue());
+
+            let csvContent = "data:text/csv;charset=utf-8,";
+
+            rows.forEach(function(rowArray) {
+                let row = rowArray.join(",");
+                csvContent += row + "\r\n";
+            });
+            
+            var encodedUri = encodeURI(csvContent);
+            var link = document.createElement("a");
+            link.setAttribute("href", encodedUri);
+            link.setAttribute("download", "assertionResult.csv");
+            document.body.appendChild(link);
+
+            link.click();
+            
+        });
+        
+    });
+   
+
+    //get td schema 
+    
+  
+  
+   
+
+    
 }
 
 ///////////////////////////////////////////////////////////
@@ -309,3 +372,4 @@ function getExamplesList(){
 ];
 return rows;
     }
+

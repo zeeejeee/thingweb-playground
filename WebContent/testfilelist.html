@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <script type="text/javascript" src="js/jquery-2.2.3.js"></script>
+    <title>Document</title>
+</head>
+<body>
+    
+</body>
+</html>
+
+<script>
+$(document).ready(function(){
+
+$.getJSON('../AssertionTester/Assertions/list.json', function (assertionList) {
+    // suppose that data looks like this:
+    // ["/data/a.json", "/data/b.json", "/data/c.json"]
+      
+    console.log(assertionList);
+    for (var i = 0; i < assertionList.length; i++) {
+        // send an AJAX request to each individual JSON file
+        // available on the server as returned by the discover endpoint
+        $.getJSON('../AssertionTester/Assertions/'+assertionList[i], function (assertion) {
+            console.log(assertion)
+            
+        });
+    }
+
+});
+
+
+})
+ </script>   
