@@ -102,9 +102,11 @@ function populateExamples(urlAddrObject){
 function performAssertionTest(e){
     e.preventDefault()
     $("#curtain").css("display","block")// drop curtian while  assertions test going on
+    $("#curtain-text").html("Assertion test is going to be loaded.")
     var assertionSchemas=[]
     var manualAssertionsJSON=[]
     var tdToValidate=window.editor.getValue()
+    
 
     var tdSchema=[];
     var draft=[];
@@ -113,13 +115,14 @@ function performAssertionTest(e){
     
 
 
-    $.getJSON('../AssertionTester/Assertions/list.json', function (assertionList) {
+    $.getJSON('list.json', function (assertionList) {
         
+        var tAssertions=assertionList.length
         
-        
-        for (var i = 0; i < assertionList.length; i++) {
+        for (var i = 0; i < tAssertions; i++) {
             // send an AJAX request to each individual JSON file
             // available on the server as returned by the discover endpoint
+            $("#curtain-text").html("Loading Assertion Schemas:"+(i*100/tAssertions).toString()+"%")
             $.getJSON('../AssertionTester/Assertions/'+assertionList[i], function (assertion) {
                 
                 assertionSchemas.push(assertion);
@@ -127,55 +130,86 @@ function performAssertionTest(e){
             });
         }
         console.log(assertionSchemas)
+        $("#curtain-text").html("Loading JSON Schema Darft 06");
+        $.getJSON('json-schema-draft-06.json', function (json) {
+                
+            draft=json;
+            $("#curtain-text").html("Loading TD Schema. ");
+            $.getJSON('td-schema.json', function (schemajson) {
+                    
+                $("#curtain-text").html("Loading Manual assertions. ");
+                  
+                        $.ajax({
+                            type: "GET",
+                            url: "manual.csv",
+                            dataType: "text",
+                            success: function(data) {fetchManualAssertions(data);}
+                        });
+
+
+                    function fetchManualAssertions(allText) {
+                        var allTextLines = allText.split(/\r\n|\n/);
+                        var headers = allTextLines[0].split(',');
+                        var asser = [];
+
+                        for (var i=1; i<allTextLines.length; i++) {
+                            var data = allTextLines[i].split(',');
+                            if (data.length == headers.length) {
+
+                                var tarr = {"ID":data[0],"Status":data[1],"Comment":data[2]};
+                                asser.push(tarr);
+                            }
+                        }
+
+                        tdSchema=schemajson;
+                var curCsvResults = []
+                
+                try {
+                    curCsvResults = assertionValidate(tdToValidate, assertionSchemas, asser, tdSchema, draft);
+                    
+                    //toOutput(JSON.parse(tdToValidate).id, outputLocation, curCsvResults)
+                    console.log(curCsvResults);
+                } catch (error) {
+                    //this needs to go to output
+                    console.log({
+                        "ID": error,
+                        "Status": "fail",
+                        "Comment":"Invalid TD"
+                    });
+                }
+                //console.log(schemajson)
+
+                $("#curtain-text").html("Creating outputfile.");
+                rows=assertionTester(window.editor.getValue());
+    
+                let csvContent = "data:text/csv;charset=utf-8,";
+    
+                rows.forEach(function(rowArray) {
+                    let row = rowArray.join(",");
+                    csvContent += row + "\r\n";
+                });
+                
+                var encodedUri = encodeURI(csvContent);
+                var link = document.createElement("a");
+                link.setAttribute("href", encodeURIComponent(JSON.stringify(curCsvResults)));
+                link.setAttribute("download", "assertionResult.csv");
+                document.body.appendChild(link);
+    
+                link.click();
+                $("#curtain").css("display","none")// remove curtain
+                         
+                    }
+
+                
+        });
+
+    });
+       
     
     });
 
     //get schema draft
-    var xyz;
-    var test=0;
-    $.getJSON('json-schema-draft-06.json', function (json) {
-                
-        draft=json;
-        $.getJSON('td-schema.json', function (schemajson) {
-                
-            tdSchema=schemajson;
-            var curCsvResults = []
-            try {
-                curCsvResults = assertionValidate(tdToValidate, assertionSchemas, manualAssertionsJSON, tdSchema, draft);
-                
-                //toOutput(JSON.parse(tdToValidate).id, outputLocation, curCsvResults)
-                console.log(curCsvResults);
-            } catch (error) {
-                //this needs to go to output
-                console.log({
-                    "ID": error,
-                    "Status": "fail",
-                    "Comment":"Invalid TD"
-                });
-            }
-            //console.log(schemajson)
-            rows=assertionTester(window.editor.getValue());
-
-            let csvContent = "data:text/csv;charset=utf-8,";
-
-            rows.forEach(function(rowArray) {
-                let row = rowArray.join(",");
-                csvContent += row + "\r\n";
-            });
-            
-            var encodedUri = encodeURI(csvContent);
-            var link = document.createElement("a");
-            link.setAttribute("href", encodedUri);
-            link.setAttribute("download", "assertionResult.csv");
-            document.body.appendChild(link);
-
-            link.click();
-            $("#curtain").css("display","none")// remove curtain
-            
-        });
-        
-    });
-   
+    
 
     //get td schema 
     
@@ -377,3 +411,80 @@ function getExamplesList(){
 return rows;
     }
 
+/////////////////////////////////////
+
+function isUtf8(bytes)
+{
+    var i = 0;
+    while(i < bytes.length)
+    { 
+        if(     (// ASCII
+                    bytes[i] == 0x09 ||
+                    bytes[i] == 0x0A ||
+                    bytes[i] == 0x0D ||
+                    (0x20 <= bytes[i] && bytes[i] <= 0x7E)
+                )
+          ) {
+              i += 1;
+              continue;
+          }
+
+        if(     (// non-overlong 2-byte
+                    (0xC2 <= bytes[i] && bytes[i] <= 0xDF) &&
+                    (0x80 <= bytes[i+1] && bytes[i+1] <= 0xBF)
+                )
+          ) {
+              i += 2;
+              continue;
+          }
+
+        if(     (// excluding overlongs
+                    bytes[i] == 0xE0 &&
+                    (0xA0 <= bytes[i + 1] && bytes[i + 1] <= 0xBF) &&
+                    (0x80 <= bytes[i + 2] && bytes[i + 2] <= 0xBF)
+                ) ||
+                (// straight 3-byte
+                 ((0xE1 <= bytes[i] && bytes[i] <= 0xEC) ||
+                  bytes[i] == 0xEE ||
+                  bytes[i] == 0xEF) &&
+                 (0x80 <= bytes[i + 1] && bytes[i+1] <= 0xBF) &&
+                 (0x80 <= bytes[i+2] && bytes[i+2] <= 0xBF)
+                ) ||
+                (// excluding surrogates
+                 bytes[i] == 0xED &&
+                 (0x80 <= bytes[i+1] && bytes[i+1] <= 0x9F) &&
+                 (0x80 <= bytes[i+2] && bytes[i+2] <= 0xBF)
+                )
+          ) {
+              i += 3;
+              continue;
+          }
+
+        if(     (// planes 1-3
+                    bytes[i] == 0xF0 &&
+                    (0x90 <= bytes[i + 1] && bytes[i + 1] <= 0xBF) &&
+                    (0x80 <= bytes[i + 2] && bytes[i + 2] <= 0xBF) &&
+                    (0x80 <= bytes[i + 3] && bytes[i + 3] <= 0xBF)
+                ) ||
+                (// planes 4-15
+                 (0xF1 <= bytes[i] && bytes[i] <= 0xF3) &&
+                 (0x80 <= bytes[i + 1] && bytes[i + 1] <= 0xBF) &&
+                 (0x80 <= bytes[i + 2] && bytes[i + 2] <= 0xBF) &&
+                 (0x80 <= bytes[i + 3] && bytes[i + 3] <= 0xBF)
+                ) ||
+                (// plane 16
+                 bytes[i] == 0xF4 &&
+                 (0x80 <= bytes[i + 1] && bytes[i + 1] <= 0x8F) &&
+                 (0x80 <= bytes[i + 2] && bytes[i + 2] <= 0xBF) &&
+                 (0x80 <= bytes[i + 3] && bytes[i + 3] <= 0xBF)
+                )
+          ) {
+              i += 4;
+              continue;
+          }
+
+        return true;
+    }
+
+    return true;
+}

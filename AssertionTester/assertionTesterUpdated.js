@@ -1,13 +1,153 @@
-function assertionValidate(tdData, assertions, manualAssertions, tdSchema,schemaDraft) {
+// Libraries
+// libraries that can run only on a backend/script
+const fs = require('fs');
 
+// libraries that can also run in browser
+
+// used to check whether the supplied data is utf8
+const isUtf8 = require('is-utf8');
+// A special JSON validator that is used only to check whether the given object has duplicate keys. The standard library doesn't detect duplicate keys and overwrites the first one with the second one.
+var jsonValidator = require('json-dup-key-validator');
+// The usual library used for validation
+var Ajv = require('ajv');
+const draftLocation = "./json-schema-draft-06.json"; // Used by AJV as the JSON Schema draft to rely on
+const tdSchemaLocation = "../WebContent/td-schema.json"
+// JSON to CSV and vice versa libraries
+const Json2csvParser = require('json2csv').Parser;
+const csvjson = require('csvjson');
+
+// Building the CSV and its corresponding JSON structure
+const fields = ['ID', 'Status', 'Comment'];
+const json2csvParser = new Json2csvParser({
+    fields
+});
+
+var outputLocation
+
+// This is used to validate if the multi language JSON keys are valid according to the BCP47 spec
+const bcp47pattern = /^(?:(en-GB-oed|i-ami|i-bnn|i-default|i-enochian|i-hak|i-klingon|i-lux|i-mingo|i-navajo|i-pwn|i-tao|i-tay|i-tsu|sgn-BE-FR|sgn-BE-NL|sgn-CH-DE)|(art-lojban|cel-gaulish|no-bok|no-nyn|zh-guoyu|zh-hakka|zh-min|zh-min-nan|zh-xiang))$|^((?:[a-z]{2,3}(?:(?:-[a-z]{3}){1,3})?)|[a-z]{4}|[a-z]{5,8})(?:-([a-z]{4}))?(?:-([a-z]{2}|\d{3}))?((?:-(?:[\da-z]{5,8}|\d[\da-z]{3}))*)?((?:-[\da-wy-z](?:-[\da-z]{2,8})+)*)?(-x(?:-[\da-z]{1,8})+)?$|^(x(?:-[\da-z]{1,8})+)$/i; // eslint-disable-line max-len
+
+//main logic
+
+// getting the TDs to validate
+var tdsToValidate = processArguments(process.argv);
+
+//filling the assertions array
+var assertionSchemas = collectAssertionSchemas("./Assertions/");
+
+//fetching the manual.csv filled by the user
+var manualAssertionsJSON = fetchManualAssertions("./manual.csv");
+
+//fetching the JSON Schema Draft
+var draftData = fs.readFileSync(draftLocation)
+var draft = JSON.parse(draftData);
+
+//fetching the TD Validation Schema
+var tdSchemaData = fs.readFileSync(tdSchemaLocation);
+var tdSchema = JSON.parse(tdSchemaData);
+
+//validating all the TDs
+tdsToValidate.forEach((tdToValidate)=>{
+    //running the validation for a single TD
+    var curCsvResults = []
+    try {
+        curCsvResults = validate(tdToValidate, assertionSchemas, manualAssertionsJSON, tdSchema, draft);
+        if (!outputLocation) outputLocation = "./Results"
+        toOutput(JSON.parse(tdToValidate).id, outputLocation, curCsvResults)
+        console.log(curCsvResults);
+    } catch (error) {
+        //this needs to go to output
+        console.log({
+            "ID": error,
+            "Status": "fail",
+            "Comment":"Invalid TD"
+        });
+    }
+});
+
+
+// based on the given arguments to the string it returns an array, composed of raw buffer TDs
+// in the meantime it fills the outputLocation global variable
+function processArguments(argumentArray){
+    // Takes the second argument as the TD location to validate
+    var secondArgument;
+    var returnArray =[]; //array of TDs to be returned. They are not parsed before returning
+
+    if (argumentArray[2]) {
+        //console.log("there is second arg");
+        if (typeof argumentArray[2] === "string") {
+            console.log("Taking input ", argumentArray[2]);
+            secondArgument = argumentArray[2];
+        } else {
+            console.error("Second argument should be string");
+            throw "Argument error";
+        }
+    } else {
+        console.error("There is NO second argument, put the location of the TD or of the directory with TDs");
+        throw "Argument error";
+    }
+
+    // in case there is a third argument for the output location of the results, assign it to the global outputLocation variable.
+    if (argumentArray[3]) {
+        if (typeof argumentArray[3] === "string") {
+            console.log("Taking output ", argumentArray[3]);
+            outputLocation = argumentArray[3];
+        } else {
+            console.error("Third argument should be string");
+            throw "Argument error";
+        }
+    } 
+
+    /*
+    This try catch handles the case whether the script is run with a directory as a second argument or with a TD file
+    In case it is a directory, all the TDs inside it will be added to the list of TDs to be validated
+    Otherwise the array will contain only one Thing
+    */
+    try {
+        // check if it is a directory
+        var dirLocation = secondArgument;
+        var tdLocationList = fs.readdirSync(dirLocation);
+        console.log("Validating an Implementation with Multiple TDs")
+        tdLocationList.forEach((curTDLocation) => {
+            var curTDraw = fs.readFileSync(dirLocation+curTDLocation);
+            returnArray.push(curTDraw)
+        });
+    } catch (error) {
+        // not a directory so take the TD, hopefully
+        console.log("Validating a single TD")
+        var storedTdAddress = secondArgument;
+        var curTDraw = fs.readFileSync(storedTdAddress);
+        returnArray.push(curTDraw)
+    }
+    return returnArray;
+}
+
+// returns a JSON array containing JSON Objects corresponding to assertion JSON Schemas
+function collectAssertionSchemas(assertionsDirectory){
+    var assertionSchemas = [];
+    var assertionsListLocation = fs.readdirSync(assertionsDirectory);
+    assertionsListLocation.forEach((curAssertion, index) => {
+
+        var schemaLocation = assertionsDirectory + curAssertion;
+        var schemaRaw = fs.readFileSync(schemaLocation);
+        var schemaJSON = JSON.parse(schemaRaw);
+        assertionSchemas.push(schemaJSON);
+    });
+    return assertionSchemas;
+}
+
+// validates the TD in the first argument according to the assertions given in the second argument
+// manual assertions given in the third argument are pushed to the end of the array after sorting the results array
+// return is a JSON array of result JSON objects
+
+//if there is a throw, it gives the failed assertion id
+function validate(tdData, assertions, manualAssertions, tdSchema,schemaDraft) {
     // a JSON file that will be returned containing the result for each assertion as a JSON Object
     var results = [];
     console.log("=================================================================");
-    //console.log(schemaDraft)
 
     // check whether it is a valid UTF-8 string
-   //******pending *//
-   if (isUtf8(tdData)) {
+    if (isUtf8(tdData)) {
         results.push({
             "ID": "td-json-open_utf-8",
             "Status": "pass"
@@ -30,15 +170,11 @@ function assertionValidate(tdData, assertions, manualAssertions, tdSchema,schema
     // checking whether two interactions of the same interaction affordance type have the same names
     // This requires to use the string version of the TD that will be passed down to the jsonvalidator library
     var tdDataString = tdData.toString();
-    
-   //******pending *// results = checkUniqueness(tdDataString,results);
-    console.log(results)
-
+    results = checkUniqueness(tdDataString,results);
 
     // Normal TD Schema validation but this allows us to test multiple assertions at once
     try {
         results = checkVocabulary(tdJson, results, tdSchema, schemaDraft);
-        
     } catch (error) {
         console.log({
             "ID": error,
@@ -48,20 +184,12 @@ function assertionValidate(tdData, assertions, manualAssertions, tdSchema,schema
     }
 
     // additional checks
-    console.log("before security check")
-    results = assertionCheckSecurity(tdJson,results);
-    console.log("after security check",results)
-    
-
+    results = checkSecurity(tdJson,results);
     results = checkMultiLangConsistency(tdJson, results);
-    
 
     // Iterating through assertions
-    console.log(assertions.length)
-    var tlength=assertions.length
-    for (let index = 0; index < tlength; index++) {
-        
-        
+
+    for (let index = 0; index < assertions.length; index++) {
         const curAssertion = assertions[index];
         
         var schema = curAssertion
@@ -75,7 +203,7 @@ function assertionValidate(tdData, assertions, manualAssertions, tdSchema,schema
             "allErrors": true
         };
         var ajv = new Ajv(avj_options);
-        ajv.addMetaSchema(schemaDraft);
+        ajv.addMetaSchema(draft);
         ajv.addSchema(schema, 'td');
 
 
@@ -235,9 +363,21 @@ function assertionValidate(tdData, assertions, manualAssertions, tdSchema,schema
     });
 
     results = orderedResults.concat(manualAssertions);
-   //**** pending */// var csvResults = json2csvParser.parse(results);
-    //return csvResults;
-    return results// this will be removed once json2csvparser is loaded
+    var csvResults = json2csvParser.parse(results);
+    return csvResults;
+}
+
+function toOutput(tdId, outputLocation, csvResults) {
+
+    var fileName = tdId.replace(/:/g, "_");
+
+    fs.writeFile(outputLocation+"/result-" + fileName + ".csv", csvResults, function (err) {
+        if (err) {
+            return console.log(err);
+        }
+        console.log("The result-" + fileName + ".csv is saved!");
+    });
+    
 }
 
 function mergeIdenticalResults(results) {
@@ -558,7 +698,7 @@ function checkVocabulary(tdJson, results, tdSchema, schemaDraft) {
 
 
     var ajv = new Ajv();
-    ajv.addMetaSchema(schemaDraft);
+    ajv.addMetaSchema(draft);
     ajv.addSchema(tdSchema, 'td');
 
     var valid = ajv.validate('td', tdJson);
@@ -616,8 +756,7 @@ function securityContains(parent, child) {
     return child.every(elem => parent.indexOf(elem) > -1);
 }
 
-function assertionCheckSecurity(td,results) {
-    console.log("in securitycheck")
+function checkSecurity(td,results) {
     if (td.hasOwnProperty("securityDefinitions")) {
         var securityDefinitionsObject = td.securityDefinitions;
         var securityDefinitions = Object.keys(securityDefinitionsObject);

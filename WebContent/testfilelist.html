@@ -15,22 +15,30 @@
 <script>
 $(document).ready(function(){
 
-$.getJSON('../AssertionTester/Assertions/list.json', function (assertionList) {
-    // suppose that data looks like this:
-    // ["/data/a.json", "/data/b.json", "/data/c.json"]
-      
-    console.log(assertionList);
-    for (var i = 0; i < assertionList.length; i++) {
-        // send an AJAX request to each individual JSON file
-        // available on the server as returned by the discover endpoint
-        $.getJSON('../AssertionTester/Assertions/'+assertionList[i], function (assertion) {
-            console.log(assertion)
-            
-        });
+    
+    $.ajax({
+        type: "GET",
+        url: "manual.csv",
+        dataType: "text",
+        success: function(data) {fetchManualAssertions(data);}
+     });
+
+
+function fetchManualAssertions(allText) {
+    var allTextLines = allText.split(/\r\n|\n/);
+    var headers = allTextLines[0].split(',');
+    var asser = [];
+
+    for (var i=1; i<allTextLines.length; i++) {
+        var data = allTextLines[i].split(',');
+        if (data.length == headers.length) {
+
+            var tarr = {"ID":data[0],"Status":data[1],"Comment":data[2]};
+            asser.push(tarr);
+        }
     }
-
-});
-
+    
+}
 
 })
  </script>   
