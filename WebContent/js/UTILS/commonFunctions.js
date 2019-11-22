@@ -6,6 +6,7 @@ function assertionValidate(tdData, assertions, manualAssertions, tdSchema,schema
     //console.log(schemaDraft)
 
     // check whether it is a valid UTF-8 string
+   //******pending *//
    /* if (isUtf8(tdData)) {
         results.push({
             "ID": "td-json-open_utf-8",
@@ -29,14 +30,15 @@ function assertionValidate(tdData, assertions, manualAssertions, tdSchema,schema
     // checking whether two interactions of the same interaction affordance type have the same names
     // This requires to use the string version of the TD that will be passed down to the jsonvalidator library
     var tdDataString = tdData.toString();
+    
+   //******pending *// results = checkUniqueness(tdDataString,results);
     console.log(results)
-    results = checkUniqueness(tdDataString,results);
 
 
     // Normal TD Schema validation but this allows us to test multiple assertions at once
     try {
         results = checkVocabulary(tdJson, results, tdSchema, schemaDraft);
-        console.log(results)
+        
     } catch (error) {
         console.log({
             "ID": error,
@@ -47,7 +49,8 @@ function assertionValidate(tdData, assertions, manualAssertions, tdSchema,schema
 
     // additional checks
     
-    results = checkSecurity(tdJson,results);
+    //****pending//results = checkSecurity(tdJson,results);
+    console.log(results)
     
 
     results = checkMultiLangConsistency(tdJson, results);
@@ -69,7 +72,7 @@ function assertionValidate(tdData, assertions, manualAssertions, tdSchema,schema
             "allErrors": true
         };
         var ajv = new Ajv(avj_options);
-        ajv.addMetaSchema(draft);
+        ajv.addMetaSchema(schemaDraft);
         ajv.addSchema(schema, 'td');
 
 
@@ -229,8 +232,9 @@ function assertionValidate(tdData, assertions, manualAssertions, tdSchema,schema
     });
 
     results = orderedResults.concat(manualAssertions);
-    var csvResults = json2csvParser.parse(results);
-    return csvResults;
+   //**** pending */// var csvResults = json2csvParser.parse(results);
+    //return csvResults;
+    return results// this will be removed once json2csvparser is loaded
 }
 
 function checkVocabulary(tdJson, results, tdSchema, draft) {
@@ -243,7 +247,6 @@ function checkVocabulary(tdJson, results, tdSchema, draft) {
     td-security-mandatory
     */
 console.log("in check vocbulary")
-   var results=[]
 
     var ajv = new Ajv();
     ajv.addMetaSchema(draft);
@@ -252,7 +255,7 @@ console.log("in check vocbulary")
 
     var valid = ajv.validate('td', tdJson);
     var otherAssertions = ["td-objects_securityDefinitions", "td-arrays_security", "td-vocab-security--Thing", "td-security-mandatory", "td-vocab-securityDefinitions--Thing", "td-context-toplevel", "td-vocab-title--Thing", "td-vocab-security--Thing", "td-vocab-id--Thing", "td-security", "td-security-activation", "td-context-ns-thing-mandatory", "td-map-type", "td-array-type", "td-class-type", "td-string-type", "td-security-schemes"];
-
+   console.log(results)
     if (valid) {
         results.push({
             "ID": "td-processor",
@@ -280,7 +283,7 @@ console.log("in check vocbulary")
         //         "Status": "fail"
         //     });
         // });
-        throw "invalid TD jhkjhkjhjh";
+        throw "invalid TD";
     }
 }
 
@@ -599,4 +602,339 @@ function arrayArraysItemsEqual(myArray) {
             return false;
         }
     }
+}
+
+function checkUniqueness(tdString, results) {
+
+    // Checking whether in one interaction pattern there are duplicate names, e.g. two properties called temp
+    // However, if there are no properties then it is not-impl
+
+    // jsonvalidator throws an error if there are duplicate names in the interaction level
+    try {
+        jsonValidator.parse(tdString, false);
+
+        var td = JSON.parse(tdString);
+
+        // no problem in interaction level
+        var tdInteractions = [];
+
+        // checking whether there are properties at all, if not uniqueness is not impl
+        if (td.hasOwnProperty("properties")) {
+            tdInteractions = tdInteractions.concat(Object.keys(td.properties));
+            // then we can add unique properties pass 
+            results.push({
+                "ID": "td-properties_uniqueness",
+                "Status": "pass",
+                "Comment": ""
+            });
+        } else {
+            // then we add unique properties as not impl
+            results.push({
+                "ID": "td-properties_uniqueness",
+                "Status": "not-impl",
+                "Comment": "no properties"
+            });
+        }
+
+        // similar to just before, checking whether there are actions at all, if not uniqueness is not impl
+        if (td.hasOwnProperty("actions")) {
+            tdInteractions = tdInteractions.concat(Object.keys(td.actions));
+            results.push({
+                "ID": "td-actions_uniqueness",
+                "Status": "pass",
+                "Comment": ""
+            });
+        } else {
+            // then we add unique actions as not impl
+            results.push({
+                "ID": "td-actions_uniqueness",
+                "Status": "not-impl",
+                "Comment": "no actions"
+            });
+        }
+
+        // similar to just before, checking whether there are events at all, if not uniqueness is not impl
+        if (td.hasOwnProperty("events")) {
+            tdInteractions = tdInteractions.concat(Object.keys(td.events));
+            results.push({
+                "ID": "td-events_uniqueness",
+                "Status": "pass",
+                "Comment": ""
+            });
+        } else {
+            // then we add unique events as not impl
+            results.push({
+                "ID": "td-events_uniqueness",
+                "Status": "not-impl",
+                "Comment": "no events"
+            });
+        }
+
+        return results;
+
+    } catch (error) {
+        // there is a duplicate somewhere
+
+        // convert it into string to be able to process it
+        // error is of form = Error: Syntax error: duplicated keys "overheating" near ting": {
+        var errorString = error.toString();
+        // to get the name, we need to remove the quotes around it
+        var startQuote = errorString.indexOf('"');
+        // slice to remove the part before the quote
+        var restString = errorString.slice(startQuote + 1);
+        // find where the interaction name ends
+        var endQuote = restString.indexOf('"');
+        // finally get the interaction name
+        var interactionName = restString.slice(0, endQuote);
+
+        //trying to find where this interaction is and put results accordingly
+        var td = JSON.parse(tdString);
+
+        if (td.hasOwnProperty("properties")) {
+            var tdProperties = td.properties;
+            if (tdProperties.hasOwnProperty(interactionName)) {
+                //duplicate was at properties but that fails the td-unique identifiers as well
+                // console.log("at property");
+                results.push({
+                    "ID": "td-properties_uniqueness",
+                    "Status": "fail",
+                    "Comment": "duplicate property names"
+                });
+                // since JSON.parse removes duplicates, we replace the duplicate name with duplicateName
+                tdString = tdString.replace(interactionName, "duplicateName");
+
+            } else {
+                // there is duplicate but not here, so pass
+                results.push({
+                    "ID": "td-properties_uniqueness",
+                    "Status": "pass",
+                    "Comment": ""
+                });
+            }
+        } else {
+            results.push({
+                "ID": "td-properties_uniqueness",
+                "Status": "not-impl",
+                "Comment": "no properties"
+            });
+        }
+
+        if (td.hasOwnProperty("actions")) {
+            var tdActions = td.actions;
+            if (tdActions.hasOwnProperty(interactionName)) {
+                //duplicate was at actions but that fails the td-unique identifiers as well
+                // console.log("at action");
+                results.push({
+                    "ID": "td-actions_uniqueness",
+                    "Status": "fail",
+                    "Comment": "duplicate action names"
+                });
+                // since JSON.parse removes duplicates, we replace the duplicate name with duplicateName
+                tdString = tdString.replace(interactionName, "duplicateName");
+            } else {
+                results.push({
+                    "ID": "td-actions_uniqueness",
+                    "Status": "pass",
+                    "Comment": ""
+                });
+            }
+        } else {
+            results.push({
+                "ID": "td-actions_uniqueness",
+                "Status": "not-impl",
+                "Comment": "no actions"
+            });
+        }
+
+        if (td.hasOwnProperty("events")) {
+            var tdEvents = td.events;
+            if (tdEvents.hasOwnProperty(interactionName)) {
+                //duplicate was at events but that fails the td-unique identifiers as well
+                // console.log("at event");
+                results.push({
+                    "ID": "td-events_uniqueness",
+                    "Status": "fail",
+                    "Comment": "duplicate event names"
+                });
+                // since JSON.parse removes duplicates, we replace the duplicate name with duplicateName
+                tdString = tdString.replace(interactionName, "duplicateName");
+            } else {
+                results.push({
+                    "ID": "td-events_uniqueness",
+                    "Status": "pass",
+                    "Comment": ""
+                });
+            }
+        } else {
+            results.push({
+                "ID": "td-events_uniqueness",
+                "Status": "not-impl",
+                "Comment": "no events"
+            });
+        }
+
+        return results;
+    }
+}
+
+
+function checkBCP47array(myArray){
+    // return tag name if one is not valid during the check
+
+    for (let index = 0; index < myArray.length; index++) {
+        const element = myArray[index];
+        if (bcp47pattern.test(element)) {
+            //keep going
+        } else {
+            return element;
+        }
+    } 
+    
+    // return true if reached the end
+    return "ok";
+}
+
+function checkAzeri(myMultiLangArray){
+    for (let index = 0; index < myMultiLangArray.length; index++) {
+        const element = myMultiLangArray[index];
+        if (element =="az"){
+            return "fail"
+        } else if ((element == "az-Latn") || (element == "az-Arab")){
+            return "pass"
+        }
+    }
+    // no azeri, so it is not implemented
+    return "not-impl"
+}
+
+function mergeIdenticalResults(results) {
+    // first generate a list of results that appear more than once
+    // it should be a JSON object, keys are the assertion ids and the value is an array
+    // while putting these results, remove them from the results FIRST
+    // then for each key, find the resulting result: 
+    //if one fail total fail, if one pass and no fail then pass, otherwise not-impl
+
+    var identicalResults = {};
+    results.forEach((curResult, index) => {
+        var curId = curResult.ID;
+
+        // remove this one, but add it back if there is no duplicate
+        results.splice(index, 1);
+        // check if there is a second one
+        const identicalIndex = results.findIndex(x => x.ID === curId);
+
+        if (identicalIndex > 0) { //there is a second one
+
+            // check if it already exists
+            if (identicalResults.hasOwnProperty(curId)) {
+                // push if it already exists
+                identicalResults[curId].push(curResult.Status)
+            } else {
+                // create a new array with values if it does not exist
+                identicalResults[curId] = [curResult.Status]
+            }
+            // put it back such that the last identical can find its duplicate that appeared before
+            results.unshift(curResult);
+            // process.exit();
+        } else {
+            // if there is no duplicate, put it back into results but at the beginning 
+            results.unshift(curResult);
+        }
+    });
+
+    //get the keys to iterate through
+    var identicalKeys = Object.keys(identicalResults)
+
+    // iterate through each duplicate, calculate the new result, set the new result and then remove the duplicates 
+    identicalKeys.forEach((curKey) => {
+        var curResults = identicalResults[curKey];
+        var newResult;
+
+        if (curResults.indexOf("fail") >= 0) {
+            newResult = "fail"
+        } else if (curResults.indexOf("pass") >= 0) {
+            newResult = "pass"
+        } else {
+            newResult = "not-impl"
+        }
+        //delete each of the duplicate
+        while (results.findIndex(x => x.ID === curKey) >= 0) {
+            results.splice(results.findIndex(x => x.ID === curKey), 1);
+        }
+
+        // push back the new result
+        results.push({
+            "ID": curKey,
+            "Status": newResult,
+            "Comment": "result of a merge"
+        });
+
+    });
+    return results;
+}
+function createParents(results) {
+
+    //create a json object with parent name keys and then each of them an array of children results
+
+    var parentsJson = {};
+    results.forEach((curResult, index) => {
+        var curId = curResult.ID;
+        var underScoreLoc = curId.indexOf('_');
+        if (underScoreLoc === -1) {
+            // this assertion is not a child assertion
+        } else {
+            var parentResultID = curId.slice(0, underScoreLoc);
+            // if it already exists push otherwise create an array and push
+            if (parentsJson.hasOwnProperty(parentResultID)) {
+                parentsJson[parentResultID].push(curResult);
+            } else {
+                parentsJson[parentResultID] = [];
+                parentsJson[parentResultID].push(curResult);
+            }
+            // console.log(parentsJson);
+        }
+    });
+
+    //Go through the object and push a result that is an OR of each children
+    // if one children is fail, result is fail
+    // if one children is not-impl, result is not-impl
+    // if none of these happen, then it implies it is pass, so result is pass
+    // "ID": schema.title,
+    // "Status": "not-impl" 
+
+    parentsJsonArray = Object.getOwnPropertyNames(parentsJson);
+    parentsJsonArray.forEach((curParentName, indexParent) => {
+
+        var curParent = parentsJson[curParentName];
+
+        for (let index = 0; index < curParent.length; index++) {
+            const curChild = curParent[index];
+            if (curChild.Status == "fail") {
+                //push fail and break, i.e stop going through children, we are done here!
+                results.push({
+                    "ID": curParentName,
+                    "Status": "fail",
+                    "Comment": "Error message can be seen in the children assertions"
+                });
+                break;
+            } else if (curChild.Status == "not-impl") {
+                //push not-impl and break, i.e stop going through children, we are done here!
+                results.push({
+                    "ID": curParentName,
+                    "Status": "not-impl",
+                    "Comment": "Error message can be seen in the children assertions"
+                });
+                break;
+            } else {
+                // if reached the end without break, push pass
+                if (index == curParent.length - 1) {
+                    results.push({
+                        "ID": curParentName,
+                        "Status": "pass",
+                    });
+                }
+            }
+        }
+    });
+    return results;
 }
