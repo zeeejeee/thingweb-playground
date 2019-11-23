@@ -1,7 +1,7 @@
 function assertionValidate(tdData, assertions, manualAssertions, tdSchema,schemaDraft) {
 
     // a JSON file that will be returned containing the result for each assertion as a JSON Object
-    var results = [];
+    
     console.log("=================================================================");
     //console.log(schemaDraft)
 

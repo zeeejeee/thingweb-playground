@@ -100,6 +100,8 @@ function populateExamples(urlAddrObject){
 }
 //////////////////////////////////////////////////////////////////////
 function performAssertionTest(e){
+
+    console.log(manualAssertions)
     e.preventDefault()
     $("#curtain").css("display","block")// drop curtian while  assertions test going on
     $("#curtain-text").html("Assertion test is going to be loaded.")
@@ -136,36 +138,11 @@ function performAssertionTest(e){
             draft=json;
             $("#curtain-text").html("Loading TD Schema. ");
             $.getJSON('td-schema.json', function (schemajson) {
-                    
-                $("#curtain-text").html("Loading Manual assertions. ");
-                  
-                        $.ajax({
-                            type: "GET",
-                            url: "manual.csv",
-                            dataType: "text",
-                            success: function(data) {fetchManualAssertions(data);}
-                        });
-
-
-                    function fetchManualAssertions(allText) {
-                        var allTextLines = allText.split(/\r\n|\n/);
-                        var headers = allTextLines[0].split(',');
-                        var asser = [];
-
-                        for (var i=1; i<allTextLines.length; i++) {
-                            var data = allTextLines[i].split(',');
-                            if (data.length == headers.length) {
-
-                                var tarr = {"ID":data[0],"Status":data[1],"Comment":data[2]};
-                                asser.push(tarr);
-                            }
-                        }
-
-                        tdSchema=schemajson;
+                tdSchema=schemajson;
                 var curCsvResults = []
                 
                 try {
-                    curCsvResults = assertionValidate(tdToValidate, assertionSchemas, asser, tdSchema, draft);
+                    curCsvResults = assertionValidate(tdToValidate, assertionSchemas, manualAssertions, tdSchema, draft);
                     
                     //toOutput(JSON.parse(tdToValidate).id, outputLocation, curCsvResults)
                     console.log(curCsvResults);
@@ -176,29 +153,55 @@ function performAssertionTest(e){
                         "Status": "fail",
                         "Comment":"Invalid TD"
                     });
+                    results.push({
+                        "ID": error,
+                        "Status": "fail",
+                        "Comment":"Invalid TD"
+                    });
+                    curCsvResults=results
                 }
                 //console.log(schemajson)
 
                 $("#curtain-text").html("Creating outputfile.");
-                rows=assertionTester(window.editor.getValue());
-    
+                assertionTestResult=curCsvResults;
+                 var assertionTestResultFormatted=[];
                 let csvContent = "data:text/csv;charset=utf-8,";
     
-                rows.forEach(function(rowArray) {
-                    let row = rowArray.join(",");
-                    csvContent += row + "\r\n";
-                });
+               
                 
-                var encodedUri = encodeURI(csvContent);
-                var link = document.createElement("a");
-                link.setAttribute("href", encodeURIComponent(JSON.stringify(curCsvResults)));
-                link.setAttribute("download", "assertionResult.csv");
-                document.body.appendChild(link);
-    
-                link.click();
+                var headers = {
+                    ID: "ID",
+                    Status: "Status",
+                    Comment:"Comment"
+                };
+
+
+                assertionTestResult.forEach((item) => {
+                    if(item.Comment){
+                    assertionTestResultFormatted.push({
+                        ID: item.ID.replace(/,/g, ''), // remove commas to avoid errors,
+                        Status: item.Status.replace(/,/g, ''),
+                        Comment: item.Comment.replace(/,/g, '')    })}
+                    else{
+                        assertionTestResultFormatted.push({
+                            ID: item.ID.replace(/,/g, ''), // remove commas to avoid errors,
+                            Status: item.Status.replace(/,/g, ''),
+                            Comment: "no Comment"})
+                        }
+                    
+                    });
+                
+                var fileTitle="assertionTest";
+
+                exportCSVFile(headers, assertionTestResultFormatted, fileTitle);
+
+                
                 $("#curtain").css("display","none")// remove curtain
                          
-                    }
+                    
+                
+                  
+                        
 
                 
         });
@@ -401,15 +404,7 @@ function getExamplesList(){
 
     }
 
-//////////////////////////////////////////////////////////////////////////
-    function assertionTester(td)
-    {
-        const rows = [
-            ["td-context-default-language-direction-heuristic","null","not testable with Assertion Tester"],
-            ["td-context-default-language-direction-inference","null","not testable with Assertion Tester"]
-];
-return rows;
-    }
+
 
 /////////////////////////////////////
 
@@ -487,4 +482,53 @@ function isUtf8(bytes)
     }
 
     return true;
+}
+////////////////
+function convertToCSV(objArray) {
+    var array = typeof objArray != 'object' ? JSON.parse(objArray) : objArray;
+    var str = '';
+
+    for (var i = 0; i < array.length; i++) {
+        var line = '';
+        for (var index in array[i]) {
+            if (line != '') line += ','
+
+            line += array[i][index];
+        }
+
+        str += line + '\r\n';
+    }
+
+    return str;
+}
+
+/////////////////////
+function exportCSVFile(headers, items, fileTitle) {
+    if (headers) {
+        items.unshift(headers);
+    }
+
+    // Convert Object to JSON
+    var jsonObject = JSON.stringify(items);
+
+    var csv = this.convertToCSV(jsonObject);
+
+    var exportedFilenmae = fileTitle + '.csv' || 'export.csv';
+
+    var blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    if (navigator.msSaveBlob) { // IE 10+
+        navigator.msSaveBlob(blob, exportedFilenmae);
+    } else {
+        var link = document.createElement("a");
+        if (link.download !== undefined) { // feature detection
+            // Browsers that support HTML5 download attribute
+            var url = URL.createObjectURL(blob);
+            link.setAttribute("href", url);
+            link.setAttribute("download", exportedFilenmae);
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+    }
 }

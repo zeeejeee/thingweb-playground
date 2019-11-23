@@ -205,7 +205,7 @@ i {
     border: 2px solid red;
 }
 
-#curtain {
+.curtain {
 	position: fixed;
 	_position: absolute;
 	z-index: 99;
@@ -216,4 +216,28 @@ i {
 	background-color: rgba(255, 255, 255, 0.8) ;
 	
 	
+  }
+
+  .assertion-test-popup {
+	position: fixed;
+	_position: absolute;
+	border-radius: 10px;
+	z-index: 99;
+	left: 2%;
+	top: 10%;
+	width: 94%;
+	height: 80%;
+	background-color: rgba(255, 255, 255, 1) ;
+	
+	
+	
+  }
+  .top-right{
+
+	margin-top: 1px;
+	margin-right: 2px;
+	position:absolute;
+	top:0;
+	right:0;
+	left: 100%;
   }
