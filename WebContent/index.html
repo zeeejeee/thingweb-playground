@@ -23,7 +23,7 @@
 
 <body>
 		<div  id="assertion_test_popup" class="curtain" style="display: none; background-color: rgba(0, 0, 0, 0.8) ;" >
-				<div class="assertion-test-popup" >
+				<div class="assertion-test-popup "  >
 					<button class="btn top-right" id="close_assertion_test_popup">X</button>
 					<div >Please Select the manual assertions options.</div>
 					
@@ -314,17 +314,20 @@ $(document).ready(function(){
                     function fetchManualAssertions(allText) {
 						manualAssertions=[]
 						$("#manual_assertion_table_body").empty()
-                        var allTextLines = allText.split(/\r\n|\n/);
-                        var headers = allTextLines[0].split(',');
+                        var allTextLines = allText.split(/\r\n/);
+						var headers = allTextLines[0].split(',');
+						//console.log("all lines \n",allTextLines)
                         
 
                         for (var i=1; i<allTextLines.length; i++) {
-                            var data = allTextLines[i].split(',',4);
-                            if (data.length == headers.length) {
+							var data = allTextLines[i].split(',');
+							console.log(data.slice(3).toString())
+                            
+								
 
-                                var tarr = {"ID":data[0],"Status":data[1],"Comment":data[2],"Description":data[3]};
+                                var tarr = {"ID":data[0],"Status":data[1],"Comment":data[2],"Description":data.slice(3).toString()};
                                 manualAssertions.push(tarr);
-                            }
+                            
 						}
 						$.each( manualAssertions, function( i, assertion ) {
 						var html = 
@@ -344,7 +347,7 @@ $(document).ready(function(){
 
 					$('input[type="radio"]').on('change', function() {
 							 indexnum= $(this).parent().parent().find("input[type=hidden]").first().val()
-							 console.log(indexnum,$(this).val())
+							// console.log(indexnum,$(this).val())
 							 manualAssertions[indexnum]["Status"]=$(this).val()
   							
 					

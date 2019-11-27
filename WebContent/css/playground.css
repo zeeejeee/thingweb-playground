@@ -219,6 +219,7 @@ i {
   }
 
   .assertion-test-popup {
+	  padding: 5px;
 	position: fixed;
 	_position: absolute;
 	border-radius: 10px;
