@@ -153,18 +153,20 @@
 						   <div class="row">
 								<form >
 									<div class="form-group">
-										<input   type="checkbox"  id="box_auto_validate" value="off"> Auto Validate <br>
-										<div>
-											<label for="editor_theme">Editor Theme</label>
-											<select  id="editor_theme" class="btn btn-info dropdown-toggle" >							
-												<option class="btn-info" style="margin:0px" value="vs">White </option>
-												<option class="btn-info" style="margin:0px" value="vs-dark">Dark </option>
+										<label for="editor_theme">Editor Theme  </label>
+										<select  id="editor_theme" class="btn btn-info dropdown-toggle" >							
+											<option class="btn-info" style="margin:0px" value="vs">White </option>
+											<option class="btn-info" style="margin:0px" value="vs-dark">Dark </option>
+											
+											<option class="btn-info" style="margin:0px" value="hc-black">Contrast </option>
+											
 												
-												<option class="btn-info" style="margin:0px" value="hc-black">Contrast </option>
-												
-													
-											</select>
-										</div>
+										</select>
+										&nbsp;&nbsp;
+										<input   type="checkbox"  id="box_auto_validate" value="off"> Auto Validate
+										
+											
+										
 										<div class="btn-group" role="group">
 											<button   type="button" class="btn" id="btn_validate">Validate</button>
 											<button   type="button" class="btn" id="btn_clearLog" >Clear Log</button>
@@ -397,28 +399,19 @@ $(document).ready(function(){
 		var modelUri = monaco.Uri.parse("a://b/foo.json"); // a made up unique URI for our model
 		var model = monaco.editor.createModel(jsonCode, "json", modelUri);
 
+		$.getJSON("td-schema.json",function(json){
+			var td_schema=json;
 
 
-	// configure the JSON language support with schemas and schema associations
+			// configure the JSON language support with schemas and schema associations
 	monaco.languages.json.jsonDefaults.setDiagnosticsOptions({
 		validate: true,
 		//schemas: [schema] // List of schemas to validate against, It will validate the TD with in the editor area.
 		schemas:[{
 			uri: "http://myserver/foo-schema.json", // id of the first schema
 			fileMatch: [modelUri.toString()], // associate with our model
-			// schema: {
-			//     type: "object",
-			//     properties: {
-			//         p1: {
-			//             enum: ["v1", "v2"]
-			//         },
-			//         p2: {
-			//             $ref: "http://myserver/bar-schema.json" // reference the second schema
-			//         }
-			//     }
-			schema:{
-				$ref: "https://raw.githubusercontent.com/thingweb/thingweb-playground/master/WebContent/td-schema.json"
-			}   
+			
+			schema:td_schema 
 		}
 		]
 
@@ -440,6 +433,10 @@ $("#curtain").css("display","none")
 
 
         });
+		});
+
+
+	
   
 //*************************************************************************////
 
