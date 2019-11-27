@@ -154,14 +154,17 @@
 								<form >
 									<div class="form-group">
 										<input   type="checkbox"  id="box_auto_validate" value="off"> Auto Validate <br>
-										<select  id="editor_theme" class="btn btn-info dropdown-toggle" >							
-											<option class="btn-info" style="margin:0px" value="vs">White </option>
-											<option class="btn-info" style="margin:0px" value="vs-dark">Dark </option>
-											
-											<option class="btn-info" style="margin:0px" value="hc-black">High Contrast </option>
-											
+										<div>
+											<label for="editor_theme">Editor Theme</label>
+											<select  id="editor_theme" class="btn btn-info dropdown-toggle" >							
+												<option class="btn-info" style="margin:0px" value="vs">White </option>
+												<option class="btn-info" style="margin:0px" value="vs-dark">Dark </option>
 												
-										</select>
+												<option class="btn-info" style="margin:0px" value="hc-black">Contrast </option>
+												
+													
+											</select>
+										</div>
 										<div class="btn-group" role="group">
 											<button   type="button" class="btn" id="btn_validate">Validate</button>
 											<button   type="button" class="btn" id="btn_clearLog" >Clear Log</button>
@@ -421,7 +424,7 @@ $(document).ready(function(){
 	window.editor=monaco.editor.create(document.getElementById("monaco"), {
 		model: model,
 		contextmenu: false,
-		theme:"vs-dark"
+		theme:"vs"
 	
 
 });
